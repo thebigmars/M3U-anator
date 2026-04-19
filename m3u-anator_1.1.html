@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M3U Channel Sorter</title>
+<style>
+:root{
+  --bg:#0e1117;--bg2:#161b24;--bg3:#1e2535;
+  --border:#2a3145;--border2:#3a4460;
+  --text:#e8ecf4;--text2:#8a96b0;--text3:#5a6480;
+  --teal:#1db887;--teal2:#16a374;
+  --tealfade:rgba(29,184,135,.12);--tealfade2:rgba(29,184,135,.06);
+  --blue:#4a90e2;--bluefade:rgba(74,144,226,.1);
+  --red:#e25c5c;--redfade:rgba(226,92,92,.12);
+  --amber:#e2a93c;
+  --r:8px;--rl:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'JetBrains Mono','Fira Code','Consolas',monospace;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.logo{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;letter-spacing:.05em}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.header-tag{font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:2px 8px;letter-spacing:.08em}
+.header-right{display:flex;align-items:center;gap:8px}
+.hdr-btn{background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--r);padding:5px 12px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .12s;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
+.hdr-btn:hover{border-color:var(--border2);color:var(--text)}
+.hdr-btn svg{width:13px;height:13px;flex-shrink:0}
+.hdr-btn.undo-btn:not(:disabled):hover{border-color:var(--amber);color:var(--amber)}
+.hdr-btn:disabled{opacity:.3;cursor:not-allowed}
+.app{display:flex;flex-direction:column;height:calc(100vh - 52px);overflow:hidden}
+.main{display:flex;flex:1;overflow:hidden}
+/* Upload */
+#upload-screen{flex:1;display:flex;align-items:center;justify-content:center}
+.upload-box{border:1.5px dashed var(--border2);border-radius:var(--rl);padding:56px 64px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;max-width:480px;width:100%}
+.upload-box:hover,.upload-box.drag{border-color:var(--teal);background:rgba(29,184,135,.06)}
+.upload-icon{width:48px;height:48px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--border2);border-radius:12px;color:var(--teal)}
+.upload-icon svg{width:22px;height:22px}
+.upload-title{font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:.02em}
+.upload-sub{font-size:12px;color:var(--text3);margin-bottom:24px}
+.upload-btn{background:var(--teal);color:#000;border:none;border-radius:var(--r);padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.04em;transition:background .15s}
+.upload-btn:hover{background:var(--teal2)}
+.upload-formats{font-size:11px;color:var(--text3);margin-top:16px}
+/* Sidebar */
+#sidebar{width:240px;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:16px 0;display:flex;flex-direction:column;flex-shrink:0}
+.sb{padding:0 16px;margin-bottom:20px}
+.sb-label{font-size:10px;letter-spacing:.12em;color:var(--text3);margin-bottom:10px;text-transform:uppercase;font-weight:700}
+.fsel{width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-size:12px;font-family:inherit;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a6480' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.fsel:focus{border-color:var(--teal)}
+.fsel option{background:var(--bg3)}
+.sort-grid{display:flex;flex-direction:column;gap:4px}.sort-row{display:flex;align-items:center;gap:4px}.sort-row-label{flex:1;font-size:11px;color:var(--text2);letter-spacing:.03em}.sort-dir{display:flex;gap:3px}.sel-btns{display:flex;gap:6px}
+.sel-btns{margin-bottom:8px}
+.sort-btn,.sel-btn{flex:1;background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:var(--r);padding:7px 8px;font-size:11px;font-family:inherit;cursor:pointer;letter-spacing:.04em;transition:all .12s;text-align:center}.sort-dir-btn{background:var(--bg3);color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .12s;letter-spacing:.04em}.sort-dir-btn:hover{border-color:var(--teal);color:var(--teal)}.sort-dir-btn.on{background:var(--tealfade);border-color:var(--teal);color:var(--teal)}
+.sort-btn:hover,.sel-btn:hover{border-color:var(--teal);color:var(--teal)}
+.sort-btn.active{background:var(--tealfade);border-color:var(--teal);color:var(--teal)}
+.stat-row{display:flex;flex-direction:column;gap:6px}
+.stat-item{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg3);border-radius:var(--r)}
+.si-l{font-size:11px;color:var(--text3)}
+.si-v{font-size:13px;font-weight:700}
+.si-v.t{color:var(--teal)}.si-v.a{color:var(--amber)}.si-v.b{color:var(--blue)}
+.sb-spacer{flex:1}
+.exp-section{padding:16px;border-top:1px solid var(--border)}
+.exp-btn{width:100%;background:var(--teal);color:#000;border:none;border-radius:var(--r);padding:11px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.04em;transition:background .15s}
+.exp-btn:hover{background:var(--teal2)}
+.exp-btn:disabled{background:var(--bg3);color:var(--text3);cursor:not-allowed;border:1px solid var(--border)}
+.exp-note{font-size:11px;color:var(--text3);margin-top:8px;text-align:center}
+.merge-btn{width:100%;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:var(--r);padding:8px 16px;font-size:11px;cursor:pointer;font-family:inherit;margin-top:8px;transition:all .12s;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:6px}
+.merge-btn svg{width:13px;height:13px}
+.merge-btn:hover{border-color:var(--blue);color:var(--blue)}
+.reset-btn{width:100%;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--r);padding:8px 16px;font-size:11px;cursor:pointer;font-family:inherit;margin-top:8px;transition:all .12s;letter-spacing:.04em}
+.reset-btn:hover{border-color:var(--red);color:var(--red)}
+.del-sel-btn{width:100%;background:transparent;color:var(--red);border:1px solid rgba(226,92,92,.35);border-radius:var(--r);padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .12s;letter-spacing:.04em}
+.del-sel-btn:hover:not(:disabled){background:var(--redfade);border-color:var(--red)}
+.del-sel-btn:disabled{opacity:.3;cursor:not-allowed}
+.undo-sb-btn:hover:not(:disabled){background:rgba(226,169,60,.12)!important;border-color:var(--amber)!important;color:var(--amber)!important}
+/* Content */
+#content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.toolbar{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg2)}
+.sw{position:relative;flex:1}
+.si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none}
+.si svg{width:14px;height:14px}
+.search-in{width:100%;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px 8px 32px;font-size:13px;font-family:inherit;outline:none}
+.search-in:focus{border-color:var(--teal)}
+.search-in::placeholder{color:var(--text3)}
+.rc{font-size:12px;color:var(--text3);white-space:nowrap}
+/* Bulk bar */
+.bulk-bar{padding:10px 20px;background:var(--bg3);border-bottom:1px solid var(--border2);display:none;align-items:center;gap:10px;flex-wrap:wrap}
+.bulk-bar.show{display:flex}
+.bulk-label{font-size:11px;color:var(--teal);font-weight:700;white-space:nowrap;letter-spacing:.04em}
+.bulk-field{display:flex;align-items:center;gap:6px}
+.bulk-field label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+.bulk-field input{background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;font-family:inherit;outline:none;width:130px;transition:border-color .12s}
+.bulk-field input:focus{border-color:var(--teal)}
+.bulk-sep{width:1px;height:22px;background:var(--border2);flex-shrink:0}
+.bulk-apply{background:var(--teal);color:#000;border:none;border-radius:var(--r);padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s}
+.bulk-apply:hover{background:var(--teal2)}
+.bulk-clear{background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--r);padding:6px 10px;font-size:11px;cursor:pointer;font-family:inherit;transition:all .12s}
+.bulk-clear:hover{border-color:var(--red);color:var(--red)}
+.trash-btn{background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text3);cursor:pointer;padding:5px 7px;font-family:inherit;transition:all .12s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.trash-btn:hover{border-color:var(--red);color:var(--red);background:var(--redfade)}
+.trash-btn svg{width:13px;height:13px;display:block}
+/* Table */
+.tw{flex:1;overflow-y:auto}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead th{background:var(--bg2);padding:10px 12px;text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1}
+thead th:nth-child(1){width:40px}
+thead th:nth-child(2){width:120px}
+thead th:nth-child(4){width:140px}
+thead th:nth-child(5){width:86px}
+thead th:nth-child(6){width:96px}
+thead th:nth-child(7){width:210px}
+tbody tr{transition:background .08s}
+tbody tr:hover td{background:var(--bg3)}
+tbody tr.rs td{background:var(--tealfade2)}
+tbody tr.rs:hover td{background:var(--tealfade)}
+td{padding:7px 12px;border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:12px;height:52px;vertical-align:middle}
+td.num{color:var(--text3);font-size:11px;text-align:right}
+td.gc,td.cc,td.lc{color:var(--text2)}
+td.ac{padding:0 6px;text-align:center}
+.chn{font-weight:500}
+.edot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--amber);margin-left:6px;vertical-align:middle}
+/* Logo */
+.name-cell{overflow:visible;position:relative}
+.name-inner{display:flex;align-items:center;gap:10px;min-width:0}
+.ch-logo-wrap{position:relative;flex-shrink:0;width:38px;height:38px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;transition:border-color .12s}
+.ch-logo-wrap:hover{border-color:var(--teal)}
+.ch-logo{width:36px;height:36px;object-fit:contain;display:block}
+.ch-logo-overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .12s;border-radius:5px}
+.ch-logo-overlay svg{width:14px;height:14px;color:#fff}
+.ch-logo-wrap:hover .ch-logo-overlay{opacity:1}
+.ch-logo-ph{position:relative;width:38px;height:38px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:border-color .12s}
+.ch-logo-ph:hover{border-color:var(--teal)}
+.ch-logo-ph svg{width:16px;height:16px;opacity:.2;transition:opacity .12s}
+.ch-logo-ph:hover svg{opacity:.5}
+.name-qe{min-width:0;flex:1;overflow:hidden}
+/* Inline edit */
+td.qe{cursor:text}
+td.qe .qe-wrap{display:inline-flex;align-items:center;gap:5px;max-width:100%}
+td.qe .qe-val{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.qe .qe-icon{flex-shrink:0;opacity:0;transition:opacity .1s;color:var(--text3)}
+td.qe .qe-icon svg{width:11px;height:11px;display:block}
+tbody tr:hover td.qe .qe-icon{opacity:1}
+td.qe:hover .qe-val{text-decoration:underline;text-decoration-color:var(--border2);text-underline-offset:2px}
+td.qe input.qe-input{background:var(--bg3);color:var(--text);border:1px solid var(--teal);border-radius:4px;padding:3px 7px;font-size:12px;font-family:inherit;outline:none;width:100%;min-width:60px}
+input.qe-logo-input{position:absolute;left:7px;top:50%;transform:translateY(-50%);z-index:20;background:var(--bg2);color:var(--text);border:1.5px solid var(--teal);border-radius:6px;padding:7px 10px;font-size:12px;font-family:'JetBrains Mono','Fira Code',monospace;outline:none;width:380px;max-width:calc(100vw - 320px);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+input[type=checkbox]{width:14px;height:14px;accent-color:var(--teal);cursor:pointer}
+.edit-btn,.play-btn{cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;justify-content:center;gap:5px;border-radius:var(--r);font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;width:100%;padding:5px 8px}
+.play-btn{background:var(--tealfade);color:var(--teal);border:1px solid rgba(29,184,135,.3)}
+.play-btn:hover{background:var(--teal);color:#000;border-color:var(--teal)}
+.play-btn svg{width:12px;height:12px;flex-shrink:0}
+.edit-btn{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.edit-btn:hover{border-color:var(--border2);color:var(--blue);background:var(--bluefade)}
+.edit-btn svg{width:12px;height:12px;flex-shrink:0}
+td.ac{padding:4px 8px;vertical-align:middle}
+.ac-btns{display:flex;flex-direction:column;gap:3px}
+/* Pager */
+.pager{padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);background:var(--bg2)}
+.pi{font-size:11px;color:var(--text3)}
+.pb{display:flex;gap:4px}
+.pg-btn{background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:12px;font-family:inherit;cursor:pointer;transition:all .1s}
+.pg-btn:hover{border-color:var(--teal);color:var(--teal)}
+.pg-btn:disabled{opacity:.3;cursor:not-allowed}
+.pg-btn.active{background:var(--tealfade);border-color:var(--teal);color:var(--teal)}
+.empty{text-align:center;padding:48px 20px;color:var(--text3)}
+.empty svg{width:40px;height:40px;margin:0 auto 16px;opacity:.3;display:block}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+/* Modal shared */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.md{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);width:580px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.mh{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between}
+.mt{font-size:13px;font-weight:700;letter-spacing:.06em}
+.ms{font-size:10px;color:var(--text3);margin-top:3px;max-width:440px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc{background:transparent;border:1px solid transparent;border-radius:6px;color:var(--text3);cursor:pointer;padding:4px 8px;font-size:16px;line-height:1;transition:all .12s}
+.mc:hover{border-color:var(--border2);color:var(--text)}
+.mb{padding:20px}
+.msl{font-size:10px;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;font-weight:700;margin:0 0 10px}
+.msl:not(:first-child){margin-top:20px}
+.mdiv{border:none;border-top:1px solid var(--border);margin:16px 0}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.fr.full{grid-template-columns:1fr}
+.fi{display:flex;flex-direction:column;gap:5px}
+.fi label{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.fi input,.fi textarea{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;font-size:12px;font-family:inherit;outline:none;transition:border-color .12s}
+.fi input:focus,.fi textarea:focus{border-color:var(--teal)}
+.fi textarea{resize:vertical;min-height:54px}
+.fi .hint{font-size:10px;color:var(--text3)}
+.fi .mono{font-family:'JetBrains Mono',monospace}
+.rp{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;font-size:10px;color:var(--text3);word-break:break-all;line-height:1.7;font-family:'JetBrains Mono',monospace;max-height:76px;overflow-y:auto;white-space:pre-wrap}
+.mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mfl{font-size:11px;color:var(--amber)}
+.mfr{display:flex;gap:8px}
+.btn-c{background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:var(--r);padding:8px 16px;font-size:12px;font-family:inherit;cursor:pointer;transition:all .12s}
+.btn-c:hover{border-color:var(--border2);color:var(--text)}
+.btn-s{background:var(--teal);color:#000;border:none;border-radius:var(--r);padding:8px 20px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:background .12s;letter-spacing:.04em}
+.btn-s:hover{background:var(--teal2)}
+/* Merge modal specifics */
+.merge-summary{display:flex;gap:10px;margin-bottom:16px}
+.merge-stat{flex:1;background:var(--bg3);border-radius:var(--r);padding:10px 12px;text-align:center}
+.merge-stat-n{font-size:20px;font-weight:700}
+.merge-stat-n.teal{color:var(--teal)}.merge-stat-n.blue{color:var(--blue)}.merge-stat-n.amber{color:var(--amber)}
+.merge-stat-l{font-size:10px;color:var(--text3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase}
+.merge-opts{display:flex;flex-direction:column;gap:8px}
+.merge-opt{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:border-color .12s}
+.merge-opt:hover{border-color:var(--border2)}
+.merge-opt.sel{border-color:var(--teal);background:var(--tealfade2)}
+.merge-opt input[type=radio]{margin-top:2px;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
+.merge-opt-title{font-size:12px;font-weight:700;margin-bottom:2px}
+.merge-opt-desc{font-size:11px;color:var(--text3)}
+.merge-preview{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);max-height:180px;overflow-y:auto;margin-top:12px}
+.merge-preview-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px}
+.merge-preview-row:last-child{border-bottom:none}
+.merge-badge{font-size:10px;padding:2px 6px;border-radius:4px;flex-shrink:0;font-weight:700;letter-spacing:.04em}
+.badge-new{background:var(--tealfade);color:var(--teal)}
+.badge-update{background:var(--bluefade);color:var(--blue)}
+/* Video player panel */
+.vp-panel{position:fixed;bottom:60px;right:32px;width:580px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);box-shadow:0 16px 48px rgba(0,0,0,.7);z-index:150;overflow:hidden;display:none;min-width:320px;min-height:220px}
+.vp-panel.show{display:flex;flex-direction:column}
+.vp-rh{position:absolute;z-index:10}
+.vp-rh-tl{top:0;left:0;width:12px;height:12px;cursor:nw-resize}
+.vp-rh-tr{top:0;right:0;width:12px;height:12px;cursor:ne-resize}
+.vp-rh-bl{bottom:0;left:0;width:12px;height:12px;cursor:sw-resize}
+.vp-rh-br{bottom:0;right:0;width:12px;height:12px;cursor:se-resize}
+.vp-rh-t{top:0;left:12px;right:12px;height:5px;cursor:n-resize}
+.vp-rh-b{bottom:0;left:12px;right:12px;height:5px;cursor:s-resize}
+.vp-rh-l{left:0;top:12px;bottom:12px;width:5px;cursor:w-resize}
+.vp-rh-r{right:0;top:12px;bottom:12px;width:5px;cursor:e-resize}
+.vp-header{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);background:var(--bg3);cursor:move;user-select:none;flex-shrink:0}
+.vp-title{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.vp-close{background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;border-radius:4px;transition:color .12s}
+.vp-close:hover{color:var(--text)}
+.vp-video-wrap{position:relative;background:#000;flex:1;min-height:0}
+.vp-video-wrap video{width:100%;height:100%;display:block;object-fit:contain}
+.vp-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;font-size:12px;color:var(--text2);background:rgba(0,0,0,.7);pointer-events:none}
+.vp-status svg{width:32px;height:32px;opacity:.4}
+.vp-status-text{font-size:11px}
+.vp-status.hidden{display:none}
+.vp-footer{padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:6px;border-top:1px solid var(--border);flex-shrink:0}
+.vp-url{font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-family:'JetBrains Mono',monospace;text-align:center}
+.vp-nav-btn{background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;transition:all .12s;flex-shrink:0}
+.vp-nav-btn:hover{border-color:var(--teal);color:var(--teal)}
+.vp-indicator{font-size:10px;font-weight:700;letter-spacing:.06em;flex-shrink:0}
+.vp-indicator.loading{color:var(--amber)}
+.vp-indicator.playing{color:var(--teal)}
+.vp-indicator.error{color:var(--red)}
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--teal);color:#000;border-radius:var(--r);padding:10px 20px;font-size:13px;font-weight:700;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:200;letter-spacing:.04em}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo"><div class="logo-dot"></div>M3U CHANNEL SORTER</div>
+  <span class="header-tag">IPTV PLAYLIST BUILDER</span>
+</div>
+
+<div class="app">
+  <div id="upload-screen">
+    <div class="upload-box" id="drop-zone">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/>
+        </svg>
+      </div>
+      <div class="upload-title">DROP YOUR M3U FILE</div>
+      <div class="upload-sub">Drag and drop here, or click to browse</div>
+      <button class="upload-btn" onclick="$('fi').click()">SELECT FILE</button>
+      <div class="upload-formats">.m3u &nbsp;·&nbsp; .m3u8 &nbsp;·&nbsp; any size</div>
+    </div>
+    <input type="file" id="fi" accept=".m3u,.m3u8,.txt" style="display:none" onchange="handleFile(this.files[0])">
+  </div>
+
+  <div class="main" id="main-app" style="display:none">
+    <div id="sidebar">
+      <div class="sb">
+        <div class="sb-label">Stats</div>
+        <div class="stat-row">
+          <div class="stat-item"><span class="si-l">Total</span><span class="si-v" id="s-tot">0</span></div>
+          <div class="stat-item"><span class="si-l">Visible</span><span class="si-v a" id="s-vis">0</span></div>
+          <div class="stat-item"><span class="si-l">Selected</span><span class="si-v t" id="s-sel">0</span></div>
+          <div class="stat-item"><span class="si-l">Edited</span><span class="si-v b" id="s-edt">0</span></div>
+        </div>
+      </div>
+      <div class="sb">
+        <div class="sb-label">Selection</div>
+        <div class="sel-btns">
+          <button class="sel-btn" onclick="selectVisible()">All visible</button>
+          <button class="sel-btn" onclick="selectNone()">None</button>
+        </div>
+        <button class="sel-btn" style="width:100%;margin-bottom:6px" onclick="invertSel()">Invert selection</button>
+        <button class="del-sel-btn" id="del-sel-btn" onclick="deleteSelected()" disabled>Delete selected</button>
+        <button class="del-sel-btn" id="undo-btn" onclick="undo()" disabled style="color:var(--amber);border-color:rgba(226,169,60,.35);margin-top:4px" title="Undo (Ctrl+Z)">↩ Undo</button>
+      </div>
+      <div class="sb">
+        <div class="sb-label">Sort</div>
+        <div class="sort-grid">
+          <div class="sort-row"><span class="sort-row-label">TVG-ID</span><div class="sort-dir"><button class="sort-dir-btn on" id="sd-tvgId-asc" onclick="setSort('tvgId','asc')">↑</button><button class="sort-dir-btn" id="sd-tvgId-desc" onclick="setSort('tvgId','desc')">↓</button></div></div>
+          <div class="sort-row"><span class="sort-row-label">Name</span><div class="sort-dir"><button class="sort-dir-btn" id="sd-name-asc" onclick="setSort('name','asc')">↑</button><button class="sort-dir-btn" id="sd-name-desc" onclick="setSort('name','desc')">↓</button></div></div>
+          <div class="sort-row"><span class="sort-row-label">Group</span><div class="sort-dir"><button class="sort-dir-btn" id="sd-group-asc" onclick="setSort('group','asc')">↑</button><button class="sort-dir-btn" id="sd-group-desc" onclick="setSort('group','desc')">↓</button></div></div>
+          <div class="sort-row"><span class="sort-row-label">Country</span><div class="sort-dir"><button class="sort-dir-btn" id="sd-country-asc" onclick="setSort('country','asc')">↑</button><button class="sort-dir-btn" id="sd-country-desc" onclick="setSort('country','desc')">↓</button></div></div>
+          <div class="sort-row"><span class="sort-row-label">Language</span><div class="sort-dir"><button class="sort-dir-btn" id="sd-language-asc" onclick="setSort('language','asc')">↑</button><button class="sort-dir-btn" id="sd-language-desc" onclick="setSort('language','desc')">↓</button></div></div>
+        </div>
+      </div>
+      <div class="sb">
+        <div class="sb-label">Genre / Group</div>
+        <select class="fsel" id="fg" onchange="applyFilters()"><option value="">All groups</option></select>
+      </div>
+      <div class="sb">
+        <div class="sb-label">Country</div>
+        <select class="fsel" id="fc" onchange="applyFilters()"><option value="">All countries</option></select>
+      </div>
+      <div class="sb">
+        <div class="sb-label">Language</div>
+        <select class="fsel" id="fl" onchange="applyFilters()"><option value="">All languages</option></select>
+      </div>
+      <div class="sb-spacer"></div>
+      <div class="exp-section">
+        <button class="exp-btn" id="exp-btn" onclick="exportM3U()" disabled>Export...</button>
+        <div class="exp-note" id="exp-note">Select channels to export</div>
+        <button class="merge-btn" onclick="$('merge-fi').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><path d="M17 6h-5m5 0V1m0 5-3-3"/><path d="M13 12H8"/><path d="M13 16H8"/></svg>
+          IMPORT & MERGE
+        </button>
+        <input type="file" id="merge-fi" accept=".m3u,.m3u8,.txt" style="display:none" onchange="loadMergeFile(this.files[0])">
+        <button class="merge-btn" onclick="openPaste()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          PASTE CHANNELS
+        </button>
+        <button class="reset-btn" onclick="resetApp()">LOAD NEW FILE</button>
+      </div>
+    </div>
+
+    <div id="content">
+      <div class="toolbar">
+        <div class="sw">
+          <div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+          <input class="search-in" type="text" id="srch" placeholder="Search channel name..." oninput="debouncedFilter()">
+        </div>
+        <div class="rc" id="rc"></div>
+      </div>
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="bulk-label" id="bulk-label">0 SELECTED</span>
+        <div class="bulk-sep"></div>
+        <div class="bulk-field"><label>Group</label><input type="text" id="b-gr" placeholder="leave blank to skip" list="dl-g"></div>
+        <div class="bulk-field"><label>Country</label><input type="text" id="b-co" placeholder="leave blank to skip" list="dl-c"></div>
+        <div class="bulk-field"><label>Language</label><input type="text" id="b-la" placeholder="leave blank to skip" list="dl-l"></div>
+        <div class="bulk-sep"></div>
+        <button class="bulk-apply" onclick="applyBulk()">APPLY</button>
+        <button class="bulk-clear" onclick="selectNone()">DESELECT ALL</button>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" id="ca" onchange="toggleAll(this)"></th>
+            <th>TVG-ID</th><th>Channel Name</th><th>Group</th><th>Country</th><th>Language</th><th></th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="emp" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          No channels match your filters
+        </div>
+      </div>
+      <div class="pager" id="pgr">
+        <div class="pi" id="pi"></div>
+        <div class="pb" id="pb"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="mo" id="modal" style="display:none" onclick="moClick(event)">
+  <div class="md">
+    <div class="mh">
+      <div><div class="mt">EDIT CHANNEL</div><div class="ms" id="m-sub"></div></div>
+      <button class="mc" onclick="closeEdit()">&#x2715;</button>
+    </div>
+    <div class="mb">
+      <div class="msl">Identity</div>
+      <div class="fr">
+        <div class="fi"><label>Display Name</label><input type="text" id="e-dn" placeholder="Name shown in player"><div class="hint">Text after the comma in #EXTINF</div></div>
+        <div class="fi"><label>TVG Name</label><input type="text" id="e-tn" placeholder="tvg-name attribute"></div>
+      </div>
+      <div class="fr">
+        <div class="fi"><label>TVG ID</label><input type="text" id="e-ti" placeholder="e.g. CNN.us"></div>
+        <div class="fi"><label>Channel Number</label><input type="number" id="e-cn" placeholder="e.g. 101" min="0"></div>
+      </div>
+      <hr class="mdiv">
+      <div class="msl">Classification</div>
+      <div class="fr">
+        <div class="fi"><label>Group / Genre</label><input type="text" id="e-gr" placeholder="e.g. News, Sports" list="dl-g"><datalist id="dl-g"></datalist></div>
+        <div class="fi"><label>Country</label><input type="text" id="e-co" placeholder="e.g. US, GB, DE" list="dl-c"><datalist id="dl-c"></datalist></div>
+      </div>
+      <div class="fr">
+        <div class="fi"><label>Language</label><input type="text" id="e-la" placeholder="e.g. English" list="dl-l"><datalist id="dl-l"></datalist></div>
+        <div class="fi"><label>EPG Shift (hours)</label><input type="number" id="e-es" placeholder="0" step="0.5"><div class="hint">tvg-shift attribute</div></div>
+      </div>
+      <hr class="mdiv">
+      <div class="msl">Media</div>
+      <div class="fr full"><div class="fi"><label>Logo URL</label><input type="text" id="e-lo" placeholder="https://..." class="mono"></div></div>
+      <div class="fr full"><div class="fi"><label>Stream URL</label><input type="text" id="e-ur" placeholder="http:// or rtmp://" class="mono"></div></div>
+      <hr class="mdiv">
+      <div class="msl">Output Preview</div>
+      <div class="rp" id="rp"></div>
+    </div>
+    <div class="mf">
+      <div class="mfl" id="m-el"></div>
+      <div class="mfr">
+        <button class="btn-c" onclick="closeEdit()">Cancel</button>
+        <button class="btn-s" onclick="saveEdit()">SAVE CHANGES</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Merge Modal -->
+<div class="mo" id="merge-modal" style="display:none" onclick="mergeOverlayClick(event)">
+  <div class="md">
+    <div class="mh">
+      <div><div class="mt">IMPORT & MERGE</div><div class="ms" id="merge-filename"></div></div>
+      <button class="mc" onclick="closeMerge()">&#x2715;</button>
+    </div>
+    <div class="mb">
+      <div class="msl">Summary</div>
+      <div class="merge-summary">
+        <div class="merge-stat"><div class="merge-stat-n teal" id="mg-new">0</div><div class="merge-stat-l">New channels</div></div>
+        <div class="merge-stat"><div class="merge-stat-n blue" id="mg-match">0</div><div class="merge-stat-l">Matching IDs</div></div>
+        <div class="merge-stat"><div class="merge-stat-n amber" id="mg-total">0</div><div class="merge-stat-l">Total in file</div></div>
+      </div>
+      <div class="msl">Merge strategy</div>
+      <div class="merge-opts">
+        <label class="merge-opt sel" id="mopt-0">
+          <input type="radio" name="mopt" value="new" checked onchange="updateMergeOpt()">
+          <div><div class="merge-opt-title">Add new channels only</div><div class="merge-opt-desc">Import channels whose TVG-ID doesn't exist in your current list. Existing channels are untouched.</div></div>
+        </label>
+        <label class="merge-opt" id="mopt-1">
+          <input type="radio" name="mopt" value="update" onchange="updateMergeOpt()">
+          <div><div class="merge-opt-title">Add new + update matches</div><div class="merge-opt-desc">Import new channels and overwrite the stream URL, logo, and group on any matching TVG-IDs.</div></div>
+        </label>
+        <label class="merge-opt" id="mopt-2">
+          <input type="radio" name="mopt" value="all" onchange="updateMergeOpt()">
+          <div><div class="merge-opt-title">Append everything</div><div class="merge-opt-desc">Add all channels from the import file regardless of duplicates.</div></div>
+        </label>
+      </div>
+      <div class="msl" style="margin-top:16px">Preview (first 10)</div>
+      <div class="merge-preview" id="merge-preview"></div>
+    </div>
+    <div class="mf">
+      <div class="mfl" id="merge-count-note"></div>
+      <div class="mfr">
+        <button class="btn-c" onclick="closeMerge()">Cancel</button>
+        <button class="btn-s" onclick="applyMerge()">MERGE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Video Player Panel -->
+<div class="vp-panel" id="vp-panel">
+  <div class="vp-rh vp-rh-tl" data-rh="tl"></div>
+  <div class="vp-rh vp-rh-tr" data-rh="tr"></div>
+  <div class="vp-rh vp-rh-bl" data-rh="bl"></div>
+  <div class="vp-rh vp-rh-br" data-rh="br"></div>
+  <div class="vp-rh vp-rh-t"  data-rh="t"></div>
+  <div class="vp-rh vp-rh-b"  data-rh="b"></div>
+  <div class="vp-rh vp-rh-l"  data-rh="l"></div>
+  <div class="vp-rh vp-rh-r"  data-rh="r"></div>
+  <div class="vp-header" id="vp-drag-handle">
+    <span class="vp-title" id="vp-title">Stream Preview</span>
+    <button class="vp-close" onclick="closePlayer()">&#x2715;</button>
+  </div>
+  <div class="vp-video-wrap">
+    <video id="vp-video" controls playsinline></video>
+    <div class="vp-status" id="vp-status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="10 8 16 12 10 16 10 8"/></svg>
+      <span class="vp-status-text" id="vp-status-text">Loading stream...</span>
+    </div>
+  </div>
+  <div class="vp-footer">
+    <button class="vp-nav-btn" onclick="playerNav(-1)" title="Previous channel">&#8592;</button>
+    <span class="vp-url" id="vp-url"></span>
+    <span class="vp-indicator" id="vp-indicator"></span>
+    <button class="vp-nav-btn" onclick="playerNav(1)" title="Next channel">&#8594;</button>
+  </div>
+</div>
+
+
+<!-- Paste Channels Modal -->
+<div class="mo" id="paste-modal" style="display:none" onclick="if(event.target===this)closePaste()">
+  <div class="md">
+    <div class="mh">
+      <div><div class="mt">PASTE CHANNELS</div><div class="ms">Paste #EXTINF lines followed by stream URLs</div></div>
+      <button class="mc" onclick="closePaste()">&#x2715;</button>
+    </div>
+    <div class="mb">
+      <div class="msl">Raw M3U text</div>
+      <div class="fi">
+        <textarea id="paste-ta" rows="14" placeholder="#EXTINF:-1 tvg-id=&quot;CNN.us&quot; tvg-name=&quot;CNN&quot; group-title=&quot;News&quot;,CNN&#10;http://example.com/cnn&#10;&#10;#EXTINF:-1 tvg-name=&quot;ESPN&quot; group-title=&quot;Sports&quot;,ESPN&#10;http://example.com/espn" style="font-family:inherit;font-size:11px;line-height:1.6;resize:vertical;min-height:120px" oninput="previewPaste()"></textarea>
+      </div>
+      <div class="mdiv"></div>
+      <div class="msl">Preview</div>
+      <div id="paste-preview" style="font-size:11px;color:var(--text3);min-height:20px;line-height:1.8"></div>
+    </div>
+    <div class="mf">
+      <div class="mfl" id="paste-count"></div>
+      <div class="mfr">
+        <button class="btn-c" onclick="closePaste()">Cancel</button>
+        <button class="btn-s" onclick="applyPaste()">ADD CHANNELS</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script>
+'use strict';
+
+// ── State ──
+let channels=[], filtered=[], currentSort='num', currentPage=1, editId=null;
+let saveHandle=null;
+let sortField='tvgId', sortDir='asc';
+let activeInline=null, inlineGen=0;
+let undoStack=[], mergeData=null;
+let hlsInstance=null;
+const PS=100, MAX_UNDO=25;
+
+// ── DOM cache ──
+const $=id=>document.getElementById(id);
+const EL={};
+function initEL(){
+  ['tbody','emp','pgr','pi','pb','rc','s-tot','s-vis','s-sel','s-edt',
+   'exp-btn','exp-note','bulk-bar','bulk-label','fg','fc','fl','undo-btn'].forEach(id=>{
+    EL[id]=$(id);
+  });
+}
+
+// ── Parse M3U ──
+function parseM3U(text){
+  const lines=text.split('\n');
+  const res=[];
+  const ga=(str,key)=>{const m=str.match(new RegExp(key+'=["\']([^"\']*)["\']','i'));return m?m[1].trim():'';};
+  let i=lines[0]&&lines[0].trim().startsWith('#EXTM3U')?1:0;
+  while(i<lines.length){
+    const line=lines[i].trim();
+    if(line.startsWith('#EXTINF')){
+      let j=i+1;
+      while(j<lines.length&&lines[j].trim().startsWith('#')&&!lines[j].trim().startsWith('#EXTINF'))j++;
+      if(j<lines.length){
+        const url=lines[j].trim();
+        if(url&&!url.startsWith('#')){
+          const ci=line.lastIndexOf(',');
+          const astr=ci>0?line.substring(0,ci):line;
+          const dn=ci>0?line.substring(ci+1).trim():'';
+          const tn=ga(astr,'tvg-name');
+          res.push({
+            id:res.length, name:tn||dn||'Unknown', displayName:dn, tvgName:tn,
+            tvgId:ga(astr,'tvg-id'), url,
+            chno:parseInt(ga(astr,'tvg-chno')||ga(astr,'channel-number')||ga(astr,'tvg-number'))||0,
+            group:ga(astr,'group-title')||'Uncategorized',
+            language:ga(astr,'tvg-language'), country:ga(astr,'tvg-country'),
+            logo:ga(astr,'tvg-logo'), epgShift:ga(astr,'tvg-shift')||ga(astr,'catchup-correction')||'',
+            raw:line, selected:false, edited:false
+          });
+          i=j+1;continue;
+        }
+      }
+    }
+    i++;
+  }
+  return res;
+}
+
+// ── Build EXTINF ──
+function buildExt(c){
+  const dur=(c.raw.match(/^#EXTINF:(-?\d+)/)||['','-1'])[1];
+  let s=`#EXTINF:${dur}`;
+  if(c.tvgId)      s+=` tvg-id="${c.tvgId}"`;
+  if(c.tvgName||c.name) s+=` tvg-name="${c.tvgName||c.name}"`;
+  if(c.logo)       s+=` tvg-logo="${c.logo}"`;
+  if(c.chno)       s+=` tvg-chno="${c.chno}"`;
+  if(c.epgShift)   s+=` tvg-shift="${c.epgShift}"`;
+  if(c.group)      s+=` group-title="${c.group}"`;
+  if(c.language)   s+=` tvg-language="${c.language}"`;
+  if(c.country)    s+=` tvg-country="${c.country}"`;
+  return s+`,${c.displayName||c.name}`;
+}
+
+// ── Undo ──
+const UNDO_FIELDS=['name','displayName','tvgName','tvgId','url','chno','group','language','country','logo','epgShift','raw','edited','selected'];
+function snapshotChannel(c){const s={id:c.id};UNDO_FIELDS.forEach(f=>s[f]=c[f]);return s;}
+function pushUndo(desc){
+  undoStack.push({desc,snap:channels.map(snapshotChannel)});
+  if(undoStack.length>MAX_UNDO)undoStack.shift();
+  EL['undo-btn'].disabled=false;
+  EL['undo-btn'].title='Undo: '+desc+' (Ctrl+Z)';
+}
+function undo(){
+  if(!undoStack.length)return;
+  const {desc,snap}=undoStack.pop();
+  channels=snap.map(s=>Object.assign({},s));
+  if(!undoStack.length){EL['undo-btn'].disabled=true;EL['undo-btn'].title='Undo (Ctrl+Z)';}
+  else{EL['undo-btn'].title='Undo: '+undoStack[undoStack.length-1].desc+' (Ctrl+Z)';}
+  populateFilters();applyFilters(true);
+  showToast('Undone: '+desc);
+}
+
+// ── File load ──
+function handleFile(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    channels=parseM3U(e.target.result);
+    if(!channels.length){showToast('No channels found');return;}
+    undoStack=[];
+    initEL();
+    populateFilters();applyFilters();
+    $('upload-screen').style.display='none';
+    $('main-app').style.display='flex';
+    EL['undo-btn'].disabled=true;
+    showToast(channels.length+' channels loaded');
+  };
+  r.readAsText(file,'UTF-8');
+}
+const dz=$('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+dz.addEventListener('click',()=>$('fi').click());
+
+// ── Filters ──
+function populateFilters(){
+  const grps=[...new Set(channels.map(c=>c.group).filter(Boolean))].sort();
+  const ctrs=[...new Set(channels.map(c=>c.country).filter(Boolean))].sort();
+  const lngs=[...new Set(channels.map(c=>c.language).filter(Boolean))].sort();
+  const fillSel=(el,items)=>{const cv=el.value;el.innerHTML='<option value="">All</option>';items.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);});if(items.includes(cv))el.value=cv;};
+  fillSel(EL['fg'],grps);fillSel(EL['fc'],ctrs);fillSel(EL['fl'],lngs);
+  const fillDl=(id,items)=>{$(id).innerHTML=items.map(v=>`<option value="${esc(v)}">`).join('');};
+  fillDl('dl-g',grps);fillDl('dl-c',ctrs);fillDl('dl-l',lngs);
+}
+
+let searchTimer=0;
+function debouncedFilter(){clearTimeout(searchTimer);searchTimer=setTimeout(applyFilters,150);}
+
+function applyFilters(keepPage=false){
+  const q=$('srch').value.toLowerCase();
+  const g=EL['fg'].value, co=EL['fc'].value, l=EL['fl'].value;
+  filtered=channels.filter(ch=>{
+    if(q&&!ch.name.toLowerCase().includes(q)&&!ch.displayName.toLowerCase().includes(q))return false;
+    if(g&&ch.group!==g)return false;
+    if(co&&ch.country!==co)return false;
+    if(l&&ch.language!==l)return false;
+    return true;
+  });
+  sortFiltered();if(!keepPage){currentPage=1;}else{const mp=Math.max(1,Math.ceil(filtered.length/PS));if(currentPage>mp)currentPage=mp;}renderTable();updateStats();
+}
+
+const NAT={numeric:true,sensitivity:'base'};
+function sortFiltered(){
+  filtered.sort((a,b)=>{
+    const av=a[sortField]||'', bv=b[sortField]||'';
+    if(!av&&!bv) return (a.name||'').localeCompare(b.name||'',undefined,NAT);
+    if(!av) return 1;
+    if(!bv) return -1;
+    const r=av.localeCompare(bv,undefined,NAT);
+    return sortDir==='asc'?r:-r;
+  });
+}
+
+function setSort(field,dir){
+  sortField=field; sortDir=dir;
+  document.querySelectorAll('.sort-dir-btn').forEach(b=>b.classList.remove('on'));
+  const btn=$('sd-'+field+'-'+dir);
+  if(btn)btn.classList.add('on');
+  applyFilters();
+}
+
+// ── Render ──
+const PENCIL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const TV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
+const PLAY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>`;
+
+function logoHTML(c){
+  if(c.logo)return `<div class="ch-logo-wrap" onclick="startInline(event,${c.id},'logo')" title="Click to change logo URL"><img class="ch-logo" src="${esc(c.logo)}" loading="lazy" onerror="this.style.display='none'"><div class="ch-logo-overlay">${PENCIL}</div></div>`;
+  return `<div class="ch-logo-ph" onclick="startInline(event,${c.id},'logo')" title="Click to add logo URL">${TV}</div>`;
+}
+
+function renderTable(){
+  const tp=Math.ceil(filtered.length/PS);
+  const pg=filtered.slice((currentPage-1)*PS,currentPage*PS);
+  EL['emp'].style.display=filtered.length?'none':'block';
+  EL['pgr'].style.display=filtered.length?'flex':'none';
+  EL['tbody'].innerHTML=pg.map(c=>`
+    <tr class="${c.selected?'rs':''}" onclick="rowClick(${c.id},event)">
+      <td><input type="checkbox" ${c.selected?'checked':''} data-cb="${c.id}" onclick="cbClick(event)"></td>
+      <td class="num qe" onclick="startInline(event,${c.id},'tvgId')" title="Click to edit TVG-ID"><div class="qe-wrap"><span class="qe-val">${esc(c.tvgId||'')}</span><span class="qe-icon">${PENCIL}</span></div></td>
+      <td class="qe name-cell" onclick="startInline(event,${c.id},'name')" title="Click to edit channel name">
+        <div class="name-inner">
+          ${logoHTML(c)}
+          <div class="name-qe qe-wrap"><span class="chn qe-val">${esc(c.name)}</span>${c.edited?'<span class="edot" title="Edited"></span>':''}<span class="qe-icon">${PENCIL}</span></div>
+        </div>
+      </td>
+      <td class="gc">${esc(c.group)}</td>
+      <td class="cc">${esc(c.country)}</td>
+      <td class="lc">${esc(c.language)}</td>
+      <td class="ac">
+        <div class="ac-btns">
+          <button class="play-btn" onclick="openPlayer(${c.id},event)" title="Test stream">${PLAY} TEST STREAM</button>
+          <div style="display:flex;gap:4px">
+            <button class="edit-btn" style="flex:1" onclick="openEdit(${c.id},event)" title="Edit all fields">${PENCIL} EDIT</button>
+            <button class="trash-btn" onclick="deleteChannel(${c.id},event)" title="Remove channel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+          </div>
+        </div>
+      </td>
+    </tr>`).join('');
+  renderPager(tp);updateStats();
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function rowClick(id,e){
+  if(e.target.closest('.edit-btn')||e.target.closest('.play-btn')||e.target.closest('.trash-btn')||e.target.closest('.qe')||e.target.type==='checkbox')return;
+  channels[id].selected=!channels[id].selected;
+  updateRowVisual(id);updateStats();
+}
+function cbClick(e){
+  e.stopPropagation();
+  const id=parseInt(e.target.dataset.cb);
+  channels[id].selected=e.target.checked;
+  updateRowVisual(id);updateStats();
+}
+function updateRowVisual(id){
+  const cb=EL['tbody'].querySelector(`input[data-cb="${id}"]`);
+  if(!cb)return;
+  const tr=cb.closest('tr');
+  tr.classList.toggle('rs',channels[id].selected);
+  cb.checked=channels[id].selected;
+}
+
+// ── Pager ──
+function renderPager(tp){
+  const st=(currentPage-1)*PS+1,en=Math.min(currentPage*PS,filtered.length);
+  EL['pi'].textContent=filtered.length?`${st}–${en} of ${filtered.length}`:'';
+  const pages=[];
+  if(tp<=7){for(let i=1;i<=tp;i++)pages.push(i);}
+  else{pages.push(1);if(currentPage>3)pages.push('...');for(let i=Math.max(2,currentPage-1);i<=Math.min(tp-1,currentPage+1);i++)pages.push(i);if(currentPage<tp-2)pages.push('...');pages.push(tp);}
+  EL['pb'].innerHTML=
+    `<button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&#8592;</button>`+
+    pages.map(p=>p==='...'?`<button class="pg-btn" disabled>...</button>`:`<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`).join('')+
+    `<button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===tp?'disabled':''}>&#8594;</button>`;
+}
+function goPage(p){const tp=Math.ceil(filtered.length/PS);if(p<1||p>tp)return;currentPage=p;renderTable();document.querySelector('.tw').scrollTop=0;}
+
+// ── Selection ──
+function toggleAll(cb){filtered.slice((currentPage-1)*PS,currentPage*PS).forEach(c=>{channels[c.id].selected=cb.checked;});renderTable();}
+function selectVisible(){filtered.forEach(c=>{channels[c.id].selected=true;});renderTable();}
+function selectNone(){channels.forEach(c=>c.selected=false);renderTable();}
+function invertSel(){filtered.forEach(c=>{channels[c.id].selected=!channels[c.id].selected;});renderTable();}
+
+// ── Stats ──
+function updateStats(){
+  const sel=channels.filter(c=>c.selected).length;
+  const edt=channels.filter(c=>c.edited).length;
+  EL['s-tot'].textContent=channels.length;
+  EL['s-vis'].textContent=filtered.length;
+  EL['s-sel'].textContent=sel;
+  EL['s-edt'].textContent=edt;
+  EL['rc'].textContent=`${filtered.length} channels`;
+  EL['exp-btn'].disabled=sel===0;
+  updateExpBtn(sel);
+  EL['exp-note'].textContent=sel>0?`${sel} channel${sel!==1?'s':''} selected`:'Select channels to export';
+  if(sel>=2){EL['bulk-bar'].classList.add('show');EL['bulk-label'].textContent=sel+' SELECTED';}
+  else EL['bulk-bar'].classList.remove('show');
+  const dsb=$('del-sel-btn');
+  if(dsb){dsb.disabled=sel===0;dsb.textContent=sel>0?`Delete ${sel} channel${sel!==1?'s':''}`:'Delete selected';}
+}
+
+// ── Inline quick-edit ──
+function startInline(e,id,field){
+  e.stopPropagation();
+  const td=e.currentTarget;
+  if(td.querySelector('input.qe-input,input.qe-logo-input'))return;
+  if(activeInline)flushInline(activeInline);
+  const gen=++inlineGen;
+  const c=channels[id];
+  const curVal=field==='tvgId'?c.tvgId||'':field==='logo'?c.logo||'':c.name||'';
+
+  if(field==='logo'){
+    const lw=td.querySelector('.ch-logo-wrap,.ch-logo-ph');
+    const inp=document.createElement('input');
+    inp.className='qe-logo-input';inp.type='text';inp.value=curVal;inp.placeholder='https://...';
+    if(lw)lw.replaceWith(inp);else td.insertBefore(inp,td.firstChild);
+    activeInline={td,id,field,inp,gen};
+    inp.focus();inp.select();
+    wireInline(inp,gen);
+  } else if(field==='name'){
+    const nq=td.querySelector('.name-qe');
+    if(nq){
+      nq.outerHTML=`<div class="name-qe"><input class="qe-input" type="text" value="${esc(curVal)}"></div>`;
+      const inp=td.querySelector('input.qe-input');
+      activeInline={td,id,field,inp,gen};
+      inp.focus();inp.select();
+      wireInline(inp,gen);
+    }
+  } else {
+    td.innerHTML=`<input class="qe-input" type="text" value="${esc(curVal)}">`;
+    const inp=td.querySelector('input');
+    activeInline={td,id,field,inp,gen};
+    inp.focus();inp.select();
+    wireInline(inp,gen);
+  }
+}
+function wireInline(inp,gen){
+  inp.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();commitInline(activeInline);}
+    if(ev.key==='Escape'){ev.preventDefault();cancelInline(gen);}
+  });
+  inp.addEventListener('blur',()=>{setTimeout(()=>{if(activeInline&&activeInline.gen===gen)commitInline(activeInline);},80);});
+}
+function flushInline(ctx){
+  if(!ctx)return;
+  const {id,field,inp}=ctx;
+  const val=inp.value.trim();
+  const c=channels[id];
+  pushUndo(`edit ${field} on "${c.name}"`);
+  if(field==='tvgId')c.tvgId=val;
+  else if(field==='logo')c.logo=val;
+  else{c.name=val;c.displayName=val;if(c.tvgName)c.tvgName=val;}
+  c.raw=buildExt(c);c.edited=true;
+  activeInline=null;
+}
+function commitInline(ctx){if(!ctx)return;flushInline(ctx);applyFilters(true);}
+function cancelInline(gen){if(!activeInline||activeInline.gen!==gen)return;activeInline=null;renderTable();}
+
+// ── Full edit modal ──
+function openEdit(id,e){
+  if(e)e.stopPropagation();
+  editId=id;
+  const c=channels[id];
+  $('m-sub').textContent=`Channel #${id} — ${c.raw.substring(0,55)}...`;
+  $('e-dn').value=c.displayName||c.name||'';$('e-tn').value=c.tvgName||'';
+  $('e-ti').value=c.tvgId||'';$('e-cn').value=c.chno||'';
+  $('e-gr').value=c.group||'';$('e-co').value=c.country||'';
+  $('e-la').value=c.language||'';$('e-es').value=c.epgShift||'';
+  $('e-lo').value=c.logo||'';$('e-ur').value=c.url||'';
+  $('m-el').textContent=c.edited?'Modified — will export with your changes':'';
+  updatePreview();
+  ['e-dn','e-tn','e-ti','e-cn','e-gr','e-co','e-la','e-es','e-lo','e-ur'].forEach(id=>{$(id).oninput=updatePreview;});
+  $('modal').style.display='flex';
+}
+function updatePreview(){
+  const p={raw:channels[editId]?.raw||'#EXTINF:-1',tvgId:$('e-ti').value,tvgName:$('e-tn').value,name:$('e-tn').value||$('e-dn').value,displayName:$('e-dn').value,logo:$('e-lo').value,chno:parseInt($('e-cn').value)||0,epgShift:$('e-es').value,group:$('e-gr').value,language:$('e-la').value,country:$('e-co').value};
+  $('rp').textContent=buildExt(p)+'\n'+$('e-ur').value;
+}
+function saveEdit(){
+  const c=channels[editId];
+  pushUndo(`edit "${c.name}"`);
+  const dn=$('e-dn').value.trim(),tn=$('e-tn').value.trim();
+  c.displayName=dn;c.tvgName=tn;c.name=tn||dn||c.name;
+  c.tvgId=$('e-ti').value.trim();c.chno=parseInt($('e-cn').value)||0;
+  c.group=$('e-gr').value.trim()||'Uncategorized';c.country=$('e-co').value.trim();
+  c.language=$('e-la').value.trim();c.epgShift=$('e-es').value.trim();
+  c.logo=$('e-lo').value.trim();c.url=$('e-ur').value.trim();
+  c.raw=buildExt(c);c.edited=true;
+  populateFilters();applyFilters(true);closeEdit();showToast('Channel saved');
+}
+function closeEdit(){$('modal').style.display='none';editId=null;}
+function moClick(e){if(e.target===$('modal'))closeEdit();}
+
+// ── Bulk edit ──
+function applyBulk(){
+  const grp=$('b-gr').value.trim(),co=$('b-co').value.trim(),la=$('b-la').value.trim();
+  if(!grp&&!co&&!la){showToast('Fill in at least one field');return;}
+  const sel=channels.filter(ch=>ch.selected);
+  pushUndo(`bulk edit ${sel.length} channels`);
+  sel.forEach(ch=>{
+    if(grp)ch.group=grp;if(co)ch.country=co;if(la)ch.language=la;
+    ch.raw=buildExt(ch);ch.edited=true;
+  });
+  $('b-gr').value='';$('b-co').value='';$('b-la').value='';
+  populateFilters();applyFilters(true);
+  showToast(`Updated ${sel.length} channels`);
+}
+
+// ── Video player ──
+let vpChannelId=null;
+function openPlayer(id,e){
+  if(e)e.stopPropagation();
+  vpChannelId=id;
+  const c=channels[id];
+  const panel=$('vp-panel');
+  const video=$('vp-video');
+  const status=$('vp-status');
+  const statusText=$('vp-status-text');
+  const indicator=$('vp-indicator');
+
+  // Lock current size so panel doesn't jump during stream swap
+  if(panel.classList.contains('show')){
+    const r=panel.getBoundingClientRect();
+    panel.style.width=r.width+'px';
+    panel.style.height=r.height+'px';
+  }
+
+  // Tear down previous HLS instance
+  if(hlsInstance){hlsInstance.destroy();hlsInstance=null;}
+  video.pause();video.removeAttribute('src');video.load();
+
+  $('vp-title').textContent=c.name;
+  $('vp-url').textContent=c.url;
+  indicator.textContent='LOADING';indicator.className='vp-indicator loading';
+  statusText.textContent='Loading stream...';
+  status.className='vp-status';
+  panel.classList.add('show');
+
+  const isHLS=c.url.includes('.m3u8')||c.url.includes('m3u8');
+
+  const onPlaying=()=>{
+    status.className='vp-status hidden';
+    indicator.textContent='PLAYING';indicator.className='vp-indicator playing';
+  };
+  const onError=()=>{
+    statusText.textContent='Stream unavailable or unsupported format';
+    status.className='vp-status';
+    indicator.textContent='ERROR';indicator.className='vp-indicator error';
+  };
+
+  video.addEventListener('playing',onPlaying,{once:true});
+  video.addEventListener('error',onError,{once:true});
+
+  if(isHLS&&typeof Hls!=='undefined'&&Hls.isSupported()){
+    hlsInstance=new Hls({enableWorker:false});
+    hlsInstance.loadSource(c.url);
+    hlsInstance.attachMedia(video);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED,()=>{video.play().catch(()=>{});});
+    hlsInstance.on(Hls.Events.ERROR,(ev,data)=>{if(data.fatal)onError();});
+  } else {
+    // Try native (works for direct HTTP streams, some HLS on Safari)
+    video.src=c.url;
+    video.play().catch(()=>{});
+  }
+}
+function playerNav(dir){
+  if(vpChannelId===null)return;
+  const idx=filtered.findIndex(ch=>ch.id===vpChannelId);
+  if(idx===-1)return;
+  const nextIdx=idx+dir;
+  if(nextIdx<0||nextIdx>=filtered.length)return;
+  openPlayer(filtered[nextIdx].id,null);
+  // Scroll table to show the new channel
+  const cb=EL['tbody']?.querySelector(`input[data-cb="${filtered[nextIdx].id}"]`);
+  if(!cb){
+    // Channel might be on a different page — navigate there
+    const page=Math.floor(nextIdx/PS)+1;
+    if(page!==currentPage){currentPage=page;renderTable();}
+  }
+}
+function closePlayer(){
+  const panel=$('vp-panel');
+  panel.classList.remove('show');
+  vpChannelId=null;
+  const video=$('vp-video');
+  if(hlsInstance){hlsInstance.destroy();hlsInstance=null;}
+  video.pause();video.removeAttribute('src');video.load();
+}
+
+// Drag + resize the player panel
+(()=>{
+  const panel=$('vp-panel'), handle=$('vp-drag-handle');
+  const MIN_W=320, MIN_H=220;
+  let mode=null; // 'drag' or resize direction string
+  let startMX=0,startMY=0,startL=0,startT=0,startW=0,startH=0;
+
+  function anchorPanel(){
+    const r=panel.getBoundingClientRect();
+    panel.style.right='auto';panel.style.bottom='auto';
+    panel.style.left=r.left+'px';panel.style.top=r.top+'px';
+    panel.style.width=r.width+'px';panel.style.height=r.height+'px';
+  }
+
+  // Drag from header
+  handle.addEventListener('mousedown',e=>{
+    if(e.target.closest('.vp-close'))return;
+    anchorPanel();
+    const r=panel.getBoundingClientRect();
+    mode='drag';
+    startMX=e.clientX;startMY=e.clientY;
+    startL=r.left;startT=r.top;
+    e.preventDefault();
+  });
+
+  // Resize from handles
+  panel.addEventListener('mousedown',e=>{
+    const rh=e.target.closest('.vp-rh');
+    if(!rh)return;
+    anchorPanel();
+    const r=panel.getBoundingClientRect();
+    mode=rh.dataset.rh;
+    startMX=e.clientX;startMY=e.clientY;
+    startL=r.left;startT=r.top;startW=r.width;startH=r.height;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove',e=>{
+    if(!mode)return;
+    const dx=e.clientX-startMX, dy=e.clientY-startMY;
+    if(mode==='drag'){
+      panel.style.left=(startL+dx)+'px';
+      panel.style.top=(startT+dy)+'px';
+      return;
+    }
+    let l=startL,t=startT,w=startW,h=startH;
+    if(mode.includes('r')) w=Math.max(MIN_W,startW+dx);
+    if(mode.includes('l')){ w=Math.max(MIN_W,startW-dx); if(w>MIN_W)l=startL+dx; }
+    if(mode.includes('b')) h=Math.max(MIN_H,startH+dy);
+    if(mode.includes('t')){ h=Math.max(MIN_H,startH-dy); if(h>MIN_H)t=startT+dy; }
+    panel.style.left=l+'px';panel.style.top=t+'px';
+    panel.style.width=w+'px';panel.style.height=h+'px';
+  });
+
+  document.addEventListener('mouseup',()=>{mode=null;});
+})();
+
+// ── Import & Merge ──
+let mergeIncoming=[];
+function loadMergeFile(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    mergeIncoming=parseM3U(e.target.result);
+    if(!mergeIncoming.length){showToast('No channels found in file');return;}
+    prepareMergeModal(file.name);
+    $('merge-fi').value='';
+  };
+  r.readAsText(file,'UTF-8');
+}
+function prepareMergeModal(fname){
+  const existingIds=new Set(channels.map(c=>c.tvgId).filter(Boolean));
+  const newChs=mergeIncoming.filter(c=>!c.tvgId||!existingIds.has(c.tvgId));
+  const matchChs=mergeIncoming.filter(c=>c.tvgId&&existingIds.has(c.tvgId));
+  $('merge-filename').textContent=fname;
+  $('mg-new').textContent=newChs.length;
+  $('mg-match').textContent=matchChs.length;
+  $('mg-total').textContent=mergeIncoming.length;
+  updateMergeCount();
+  // Preview
+  const preview10=mergeIncoming.slice(0,10);
+  $('merge-preview').innerHTML=preview10.map(c=>{
+    const isMatch=c.tvgId&&existingIds.has(c.tvgId);
+    return `<div class="merge-preview-row"><span class="merge-badge ${isMatch?'badge-update':'badge-new'}">${isMatch?'UPDATE':'NEW'}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(c.name)}</span><span style="color:var(--text3);font-size:10px;flex-shrink:0;margin-left:6px">${esc(c.tvgId||'—')}</span></div>`;
+  }).join('');
+  $('merge-modal').style.display='flex';
+  mergeData={newChs,matchChs};
+}
+function updateMergeOpt(){
+  document.querySelectorAll('.merge-opt').forEach((el,i)=>el.classList.toggle('sel',el.querySelector('input').checked));
+  updateMergeCount();
+}
+function updateMergeCount(){
+  if(!mergeData)return;
+  const mode=document.querySelector('input[name="mopt"]:checked')?.value||'new';
+  let n=0;
+  if(mode==='new')n=mergeData.newChs.length;
+  else if(mode==='update')n=mergeData.newChs.length+mergeData.matchChs.length;
+  else n=mergeIncoming.length;
+  $('merge-count-note').textContent=`Will add/update ${n} channel${n!==1?'s':''}`;
+}
+function applyMerge(){
+  if(!mergeData)return;
+  const mode=document.querySelector('input[name="mopt"]:checked')?.value||'new';
+  pushUndo(`merge (${mode})`);
+  const existingMap=new Map(channels.map(c=>[c.tvgId,c]));
+  let added=0,updated=0;
+  if(mode==='new'||mode==='update'){
+    mergeData.newChs.forEach(inc=>{
+      const newCh={...inc,id:channels.length,selected:false,edited:false};
+      channels.push(newCh);added++;
+    });
+    if(mode==='update'){
+      mergeData.matchChs.forEach(inc=>{
+        const existing=existingMap.get(inc.tvgId);
+        if(!existing)return;
+        pushUndo=()=>{}; // single undo already pushed above
+        existing.url=inc.url;existing.logo=inc.logo;existing.group=inc.group;
+        existing.raw=buildExt(existing);existing.edited=true;updated++;
+      });
+    }
+  } else {
+    mergeIncoming.forEach(inc=>{
+      const newCh={...inc,id:channels.length,selected:false,edited:false};
+      channels.push(newCh);added++;
+    });
+  }
+  // Restore pushUndo in case it was shadowed
+  closeMerge();
+  populateFilters();applyFilters(true);
+  showToast(`Merged: ${added} added${updated?', '+updated+' updated':''}`);
+}
+function closeMerge(){$('merge-modal').style.display='none';mergeData=null;mergeIncoming=[];}
+function mergeOverlayClick(e){if(e.target===$('merge-modal'))closeMerge();}
+
+// ── Export ──
+function updateExpBtn(sel){
+  const n=sel!=null?sel:channels.filter(c=>c.selected).length;
+  const btn=EL['exp-btn'];if(!btn)return;
+  btn.disabled=n===0;
+  btn.textContent=n>0?`Export... (${n})`:'Export...';
+}
+
+async function exportM3U(){
+  const sel=channels.filter(c=>c.selected);
+  if(!sel.length)return;
+  let m3u='#EXTM3U\n';
+  sel.forEach(c=>{m3u+=c.raw+'\n'+c.url+'\n';});
+  const blob=new Blob([m3u],{type:'audio/x-mpegurl'});
+
+  if(window.showSaveFilePicker){
+    try{
+      const handle=await window.showSaveFilePicker({
+        suggestedName:'playlist.m3u',
+        types:[{description:'M3U Playlist',accept:{'audio/x-mpegurl':['.m3u','.m3u8'],'text/plain':['.m3u','.m3u8']}}]
+      });
+      const w=await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      showToast(`Saved ${sel.length} channels`);
+      return;
+    }catch(e){
+      if(e.name==='AbortError')return;
+      // Fall through to download fallback
+    }
+  }
+
+  // Fallback for Firefox / unsupported browsers
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='playlist.m3u';a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Saved ${sel.length} channels`);
+}
+
+// ── Reset ──
+function resetApp(){
+  channels=[];filtered=[];currentPage=1;activeInline=null;undoStack=[];saveHandle=null;
+  closePlayer();
+  $('main-app').style.display='none';
+  $('upload-screen').style.display='flex';
+  $('fi').value='';$('srch').value='';
+}
+
+// ── Toast ──
+let toastTimer=0;
+function showToast(msg){
+  const t=$('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+
+// ── Delete single channel ──
+function deleteChannel(id,e){
+  if(e)e.stopPropagation();
+  pushUndo('delete "'+channels[id].name+'"');
+  channels.splice(id,1);
+  channels.forEach((ch,i)=>{ch.id=i;});
+  populateFilters();applyFilters(true);
+  showToast('Channel removed');
+}
+
+// ── Paste channels ──
+let pasteTimer=0;
+function openPaste(){
+  $('paste-ta').value='';
+  $('paste-preview').innerHTML='';
+  $('paste-count').textContent='';
+  $('paste-modal').style.display='flex';
+  setTimeout(()=>$('paste-ta').focus(),50);
+}
+function closePaste(){$('paste-modal').style.display='none';}
+
+function previewPaste(){
+  clearTimeout(pasteTimer);
+  pasteTimer=setTimeout(()=>{
+    const parsed=parseM3U($('paste-ta').value);
+    if(parsed.length){
+      $('paste-preview').innerHTML=parsed.slice(0,6).map(ch=>
+        `<div style="padding:2px 0;border-bottom:1px solid var(--border)">${esc(ch.name)}<span style="color:var(--text3);margin-left:8px;font-size:10px">${esc(ch.tvgId||'')}</span></div>`
+      ).join('')+(parsed.length>6?`<div style="color:var(--text3);padding:2px 0">…and ${parsed.length-6} more</div>`:'');
+      $('paste-count').textContent=parsed.length+' channel'+(parsed.length!==1?'s':'')+' detected';
+    } else {
+      $('paste-preview').innerHTML='<span style="color:var(--text3)">No valid channels detected yet</span>';
+      $('paste-count').textContent='';
+    }
+  },200);
+}
+
+function applyPaste(){
+  const parsed=parseM3U($('paste-ta').value);
+  if(!parsed.length){showToast('No valid channels found');return;}
+  pushUndo('paste '+parsed.length+' channels');
+  parsed.forEach(ch=>{
+    channels.push({...ch,id:channels.length,selected:false,edited:false});
+  });
+  closePaste();
+  populateFilters();applyFilters(true);
+  showToast('Added '+parsed.length+' channel'+(parsed.length!==1?'s':''));
+}
+// ── Delete selected ──
+function deleteSelected(){
+  const sel=channels.filter(ch=>ch.selected);
+  if(!sel.length)return;
+  if(!confirm(`Permanently remove ${sel.length} channel${sel.length!==1?'s':''}?`))return;
+  pushUndo(`delete ${sel.length} channel${sel.length!==1?'s':''}`);
+  const ids=new Set(sel.map(ch=>ch.id));
+  channels=channels.filter(ch=>!ids.has(ch.id));
+  channels.forEach((ch,i)=>{ch.id=i;});
+  currentPage=Math.min(currentPage,Math.max(1,Math.ceil(channels.length/PS)));
+  populateFilters();applyFilters(true);
+  showToast(`Deleted ${sel.length} channel${sel.length!==1?'s':''}`);
+}
+
+// ── Global keyboard ──
+document.addEventListener('keydown',e=>{
+  const modalOpen=$('modal').style.display!=='none';
+  if(e.key==='Escape'){closeEdit();closeMerge();closePlayer();closePaste();}
+  if(e.key==='Enter'&&modalOpen&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='BUTTON')saveEdit();
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!modalOpen){e.preventDefault();undo();}
+});
+</script>
+</body>
+</html>
